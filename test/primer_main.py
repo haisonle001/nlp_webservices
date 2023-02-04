@@ -75,7 +75,7 @@ def initialize_args():
                 "--resume_ckpt",
                 type=str,
                 help="Path of a checkpoint to resume from",
-                default="C:/Work/NLP/PRIMER/step70-vloss1.82-avgr0.5055.ckpt",
+                default="C:/Work/NLP/PRIMER/data/step70-vloss1.82-avgr0.5055.ckpt",
         )
 
         ####
@@ -132,7 +132,7 @@ def initialize_args():
         parser.add_argument(
                 "--primer_path",
                 type=str,
-                default="C:/Work/NLP/PRIMERA-github/text-summarization/PRIMER/PRIMER_model",
+                default="C:/Work/NLP/PRIMER/data/",
         )
         parser.add_argument(
                 "--limit_valid_batches",
@@ -876,7 +876,8 @@ def predictt(args,model):
         )
         trainer.test(model, test_dataloader)
 
-def initialize_model(args,model,docs):
+def initialize_model(args,model,docs,rdrsegmenter):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-large")
     # tokenizer.add_special_tokens(
     #             {"additional_special_tokens": ["<doc-sep>"]}
@@ -888,11 +889,11 @@ def initialize_model(args,model,docs):
     # docs=''
     try:
         docs = docs.split('<doc-sep>')
+        docs = [' '.join(rdrsegmenter.word_segment(doc)) for doc in docs]
     except Exception:
         pass
     # print(docs)
     #You can change the input to segmented
-    # docs = [' '.join(rdrsegmenter.word_segment(doc)) for doc in docs]
     dataset = [{"document": docs, "summary": "_"}]
     # print(dataset)
     # print("Loading PRIMER model ...")
@@ -903,39 +904,46 @@ def initialize_model(args,model,docs):
     for (idx, batch) in enumerate(test_dataloader):
         # print(batch)
         input_ids,output_ids,tgt = batch
-        print(input_ids.size(),output_ids.size())
+        print(input_ids,output_ids)
         break
     
     #generate
+    # input_ids.to(device)
     input_ids, attention_mask = model._prepare_input(input_ids)
     print("Predicting...")
+    model.eval()
     generated_ids = model.model.generate(
             input_ids=input_ids,
-            attention_mask=attention_mask,
+            # attention_mask=attention_mask,
             use_cache=True,
             max_length=args.max_length_tgt,
-            min_length=args.min_length_tgt,
-            num_beams=args.beam_size,
-            length_penalty=args.length_penalty,
-            no_repeat_ngram_size=3 ,
+            min_length=10,
+            num_beams=1,
+            # length_penalty=args.length_penalty,
+            # penalty_alpha=0.6, 
+            # top_k=4,
+            # no_repeat_ngram_size=3 ,
+            # early_stopping=True,
+            # skip_special_tokens=True,
     )
+    print(generated_ids)
     generated_str = model.tokenizer.batch_decode(
             generated_ids.tolist(), skip_special_tokens=True
     )
 
     #write file
-    output_dir = os.path.join(
-            args.model_path,
-            "predicted_folder"    
-        )
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    for pred in generated_str:
+    # output_dir = os.path.join(
+    #         args.model_path,
+    #         "predicted_folder"    
+    #     )
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for pred in generated_str:
 
-        with open(os.path.join(output_dir, "prediction.txt"), "w", encoding="utf-8") as of:
-            of.write(pred)
-        with open(os.path.join(output_dir, "prediction.jsonl_5" ), "w", encoding="utf-8") as fo:
-            json.dump(pred, fo, ensure_ascii=False, indent=4)
-        break
+    #     with open(os.path.join(output_dir, "prediction.txt"), "w", encoding="utf-8") as of:
+    #         of.write(pred)
+    #     with open(os.path.join(output_dir, "prediction.jsonl_5" ), "w", encoding="utf-8") as fo:
+    #         json.dump(pred, fo, ensure_ascii=False, indent=4)
+    #     break
     print(generated_str,len(generated_str))
     return generated_str

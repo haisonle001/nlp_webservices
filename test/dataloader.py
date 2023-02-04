@@ -128,7 +128,7 @@ class SummarizationDataset(Dataset):
         if self.dataset_type == "train":
             return torch.tensor(input_ids), torch.tensor(output_ids)
         else:
-            return torch.tensor(input_ids), torch.tensor(output_ids), tgt
+            return torch.tensor(input_ids).to('cuda'), torch.tensor(output_ids).to('cuda'), tgt
 
 
 class PretrainDataset(IterableDataset):
